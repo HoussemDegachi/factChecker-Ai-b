@@ -13,4 +13,4 @@ jobs:
         with:
           node-version: 20.16.0
       - run: npm ci
-      - run: npm run start
+      - run: npm run dev
