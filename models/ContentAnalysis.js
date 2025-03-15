@@ -1,7 +1,6 @@
 import { Schema, Types, model } from "mongoose";
 
 const contentAnalysisSchema = Schema({
-    title: { type: String, required: true },
     originalId: { type: String, required: true },
     conclusion: {
         type: String,
@@ -54,11 +53,15 @@ const contentAnalysisSchema = Schema({
         }
     },
 
+    generalTopic: {
+        type: String,
+        required: true
+    },
+
     timestamps: [
         {
             timestampInS: {
                 type: Number,
-                required: true
             },
             timestampInStr: {
                 type: String,
@@ -80,6 +83,29 @@ const contentAnalysisSchema = Schema({
             source: {
                 type: String,
                 required: true
+            },
+            validation: {
+                isValid: Boolean,
+                confidence: {
+                    type: Number,
+                    min: 0,
+                    max: 100
+                },
+                explanation: String,
+                references: [
+                    {
+                        title: String,
+                        url: String,
+                        author:  String,
+                        publisher: String,
+                        publicationDate: Date,
+                        credibilityScore: {
+                            type: Number,
+                            min: 1,
+                            max: 10
+                        }
+                    }
+                ]
             }
         }
     ]

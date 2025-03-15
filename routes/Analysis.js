@@ -6,7 +6,7 @@ import { isUrlIdValid } from "../middleware/Analysis.js";
 const router = Router()
 
 router
-    .route("/:id")
+    .route("/:url")
     .get(isUrlIdValid, catchAsync(analysis.get))
 
 export default router

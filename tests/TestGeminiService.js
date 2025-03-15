@@ -2,7 +2,7 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { analyzeContent, validateClaim } from '../models/GeminiService.js';
+import { analyzeContent, validateClaim } from '../Ai/index.js'
 import { getYtMetaData, extractYouTubeVideoId } from '../utils/funcs.js';
 
 dotenv.config();
