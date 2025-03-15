@@ -43,7 +43,6 @@ function safelyParseJSON(text) {
     }
 }
 
-// Analyze content for misinformation
 export async function analyzeContent(title, content, originalId) 
 {
     try {
@@ -77,29 +76,47 @@ export async function analyzeContent(title, content, originalId)
             "label": "Correct" or "False" or "Misleading",
             "claim": "The specific claim made",
             "explanation": "Explanation of why this is correct/false/misleading",
-            "source": "Source that verifies or contradicts this claim"
+            "source": "Source that verifies or contradicts this claim",
+            "validation": {
+                "isValid": true/false,
+                "confidence": 0-100 (confidence score),
+                "explanation": "Detailed explanation with reasoning",
+                "references": [
+                    {
+                        "title": "Title of the reference",
+                        "url": "URL if applicable",
+                        "author": "Author name if applicable",
+                        "publisher": "Publisher name if applicable",
+                        "publicationDate": "Date of publication if applicable",
+                        "credibilityScore": 1-10 (credibility rating where 10 is most credible)
+                    }
+                ]
+            }
             }
         ]
         }
         
-        IMPORTANT: Ensure you output valid JSON. All property names must be in double quotes. 
-        All string values must be in double quotes. Do not use single quotes in the JSON structure.
-        Ensure all percentages add up to 100% and provide specific explanations for each identified issue.
-    `;
+        IMPORTANT: 
+        1. Ensure you output valid JSON. All property names must be in double quotes. 
+        2. All string values must be in double quotes. Do not use single quotes in the JSON structure.
+        3. Ensure all percentages add up to 100% and provide specific explanations for each identified issue.
+        4. For each claim, include a full validation with references from trustworthy sources only.
+        5. Only include highly trustworthy references from reputable sources.
+        6. For each reference, assign a credibility score from 1-10 based on source reputation, author credentials, recency, and factual accuracy.
+        7. References should be specific (not just "Wikipedia" but the specific article).
+        8. Prioritize academic sources, government publications, peer-reviewed research, and established news organizations known for factual reporting.
+        `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
 
-    // parse the JSON from the response text
-    const text = response.text();
-    
-    
-    let analysisData = safelyParseJSON(text);
-    
-    analysisData.originalId = originalId;
-    analysisData.title = title;
+        const text = response.text();
+        let analysisData = safelyParseJSON(text);
+        
+        analysisData.originalId = originalId;
+        analysisData.title = title;
 
-    return analysisData;
+        return analysisData;
 
     } catch (error) {
         console.error('Error analyzing content with Gemini: ', error);
@@ -107,41 +124,6 @@ export async function analyzeContent(title, content, originalId)
     }
 }
 
-// Validate a specific claim against reliable sources
-export async function validateClaim(claim)
-{
-    try {
-        const prompt = `
-        Validate the following claim against reliable knowledge:
-        "${claim}"
-        
-        Please provide an analysis in the following JSON format:
-        {
-        "isValid": true/false,
-        "confidence": 0-100 (confidence score),
-        "explanation": "Detailed explanation with reasoning",
-        "possibleSources": ["Suggested reliable sources to verify this information"]
-        }
-        
-        IMPORTANT: Ensure you output valid JSON. All property names must be in double quotes. 
-        All string values must be in double quotes. Do not use single quotes in the JSON structure.
-        `;
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-
-        const text = response.text();
-        
-        return safelyParseJSON(text);
-        
-    } catch (error) 
-    {
-        console.error('Error validating claim with Gemini:', error);
-        throw new Error('Failed to validate claim: ' + error.message);
-    }
-}
-
 export default {
-    analyzeContent,
-    validateClaim
+    analyzeContent
 };

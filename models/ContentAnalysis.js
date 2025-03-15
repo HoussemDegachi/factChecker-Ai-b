@@ -80,12 +80,57 @@ const contentAnalysisSchema = Schema({
             source: {
                 type: String,
                 required: true
+            },
+            validation: {
+                isValid: {
+                    type: Boolean,
+                    required: true
+                },
+                confidence: {
+                    type: Number,
+                    required: true,
+                    min: 0,
+                    max: 100
+                },
+                explanation: {
+                    type: String,
+                    required: true
+                },
+                references: [
+                    {
+                        title: {
+                            type: String,
+                            required: true
+                        },
+                        url: {
+                            type: String,
+                            required: false
+                        },
+                        author: {
+                            type: String,
+                            required: false
+                        },
+                        publisher: {
+                            type: String,
+                            required: false
+                        },
+                        publicationDate: {
+                            type: String,
+                            required: false
+                        },
+                        credibilityScore: {
+                            type: Number,
+                            required: true,
+                            min: 1,
+                            max: 10
+                        }
+                    }
+                ]
             }
         }
     ]
 
     // to add later
-    // sources of information with their rating
     // educational recommendation
 })
 
