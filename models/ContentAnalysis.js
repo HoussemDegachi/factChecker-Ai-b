@@ -1,7 +1,6 @@
 import { Schema, Types, model } from "mongoose";
 
 const contentAnalysisSchema = Schema({
-    title: { type: String, required: true },
     originalId: { type: String, required: true },
     conclusion: {
         type: String,
@@ -54,11 +53,15 @@ const contentAnalysisSchema = Schema({
         }
     },
 
+    generalTopic: {
+        type: String,
+        required: true
+    },
+
     timestamps: [
         {
             timestampInS: {
                 type: Number,
-                required: true
             },
             timestampInStr: {
                 type: String,
@@ -82,45 +85,22 @@ const contentAnalysisSchema = Schema({
                 required: true
             },
             validation: {
-                isValid: {
-                    type: Boolean,
-                    required: true
-                },
+                isValid: Boolean,
                 confidence: {
                     type: Number,
-                    required: true,
                     min: 0,
                     max: 100
                 },
-                explanation: {
-                    type: String,
-                    required: true
-                },
+                explanation: String,
                 references: [
                     {
-                        title: {
-                            type: String,
-                            required: true
-                        },
-                        url: {
-                            type: String,
-                            required: false
-                        },
-                        author: {
-                            type: String,
-                            required: false
-                        },
-                        publisher: {
-                            type: String,
-                            required: false
-                        },
-                        publicationDate: {
-                            type: String,
-                            required: false
-                        },
+                        title: String,
+                        url: String,
+                        author:  String,
+                        publisher: String,
+                        publicationDate: Date,
                         credibilityScore: {
                             type: Number,
-                            required: true,
                             min: 1,
                             max: 10
                         }
@@ -131,6 +111,7 @@ const contentAnalysisSchema = Schema({
     ]
 
     // to add later
+    // sources of information with their rating
     // educational recommendation
 })
 
