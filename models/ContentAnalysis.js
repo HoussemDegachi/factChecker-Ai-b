@@ -1,7 +1,7 @@
 import { Schema, Types, model } from "mongoose";
 
 const contentAnalysisSchema = Schema({
-    title: { type: String, requried: true },
+    title: { type: String, required: true },
     originalId: { type: String, required: true },
     conclusion: {
         type: String,
@@ -15,7 +15,7 @@ const contentAnalysisSchema = Schema({
             min: 0,
             max: 100
         },
-        FalseInfromation: {
+        falseInformation: {
             type: Number,
             required: true,
             min: 0,
@@ -27,7 +27,7 @@ const contentAnalysisSchema = Schema({
             min: 0,
             max: 100
         },
-        missleadingInformation: {
+        misleadingInformation: {
             type: Number,
             required: true,
             min: 0,
@@ -60,13 +60,13 @@ const contentAnalysisSchema = Schema({
                 type: Number,
                 required: true
             },
-            timestempInStr: {
+            timestampInStr: {
                 type: String,
                 required: true
             },
             label: {
                 type: String,
-                enum: ["Correct", "False", "Missleading"],
+                enum: ["Correct", "False", "Misleading"],
                 required: true
             },
             claim: {

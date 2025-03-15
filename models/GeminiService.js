@@ -2,9 +2,48 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
-// Analyze content for misinfomation
+function safelyParseJSON(text) {
+    try {
+        let jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
+                        text.match(/```\n([\s\S]*?)\n```/) ||
+                        text.match(/{[\s\S]*?}/);
+        
+        let jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : text;
+        
+        try {
+            return JSON.parse(jsonText);
+        } catch (initialError) {
+            console.log("Initial JSON parsing failed, attempting to fix common issues...");
+            
+            jsonText = jsonText.replace(/'([^']*)'(?=\s*:)/g, '"$1"');
+            
+            jsonText = jsonText.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+            
+            jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
+            
+            try {
+                return JSON.parse(jsonText);
+            } catch (fixError) {
+                console.log("Failed to fix JSON, creating fallback object");
+                
+                return {
+                    error: "Failed to parse JSON response",
+                    rawResponse: text
+                };
+            }
+        }
+    } catch (error) {
+        console.error("Error in safelyParseJSON:", error);
+        return {
+            error: "Error parsing JSON response",
+            rawResponse: text
+        };
+    }
+}
+
+// Analyze content for misinformation
 export async function analyzeContent(title, content, originalId) 
 {
     try {
@@ -17,9 +56,9 @@ export async function analyzeContent(title, content, originalId)
         "conclusion": "Brief overall conclusion about the content's accuracy",
         "percentages": {
             "overall": 0-100 (overall accuracy score),
-            "FalseInfromation": 0-100 (percentage of false information),
+            "falseInformation": 0-100 (percentage of false information),
             "verifiedInformation": 0-100 (percentage of verified information),
-            "missleadingInformation": 0-100 (percentage of misleading information)
+            "misleadingInformation": 0-100 (percentage of misleading information)
         },
         "generalTopic": "The general topic of the content",
         "topics": {
@@ -34,37 +73,29 @@ export async function analyzeContent(title, content, originalId)
         "timestamps": [
             {
             "timestampInS": approximate timestamp in seconds if applicable,
-            "timestempInStr": "human readable timestamp or location reference",
-            "label": "Correct" or "False" or "Missleading",
+            "timestampInStr": "human readable timestamp or location reference",
+            "label": "Correct" or "False" or "Misleading",
             "claim": "The specific claim made",
-            "explanation": "Explanation of why this is correct/false/misleading"
+            "explanation": "Explanation of why this is correct/false/misleading",
+            "source": "Source that verifies or contradicts this claim"
             }
         ]
         }
+        
+        IMPORTANT: Ensure you output valid JSON. All property names must be in double quotes. 
+        All string values must be in double quotes. Do not use single quotes in the JSON structure.
         Ensure all percentages add up to 100% and provide specific explanations for each identified issue.
     `;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
 
-    // parse the JSOn from the response text
+    // parse the JSON from the response text
     const text = response.text();
-
-    // Extract JSON from the response (in case Gemini wraps it in markdown)
-    let jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
-                    text.match(/```\n([\s\S]*?)\n```/) ||
-                    text.match(/{[\s\S]*}/);
     
-    let analysisData;
-    if (jsonMatch)
-    {
-        analysisData = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-    } 
-    else
-    {
-        analysisData = JSON.parse();
-    }
-
+    
+    let analysisData = safelyParseJSON(text);
+    
     analysisData.originalId = originalId;
     analysisData.title = title;
 
@@ -72,11 +103,11 @@ export async function analyzeContent(title, content, originalId)
 
     } catch (error) {
         console.error('Error analyzing content with Gemini: ', error);
-        throw new Error('Failed to analyse')    
+        throw new Error('Failed to analyze content: ' + error.message);    
     }
 }
 
-// Validate a specific clain against reliable sources
+// Validate a specific claim against reliable sources
 export async function validateClaim(claim)
 {
     try {
@@ -91,30 +122,26 @@ export async function validateClaim(claim)
         "explanation": "Detailed explanation with reasoning",
         "possibleSources": ["Suggested reliable sources to verify this information"]
         }
+        
+        IMPORTANT: Ensure you output valid JSON. All property names must be in double quotes. 
+        All string values must be in double quotes. Do not use single quotes in the JSON structure.
         `;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;
 
         const text = response.text();
-
-        // Extract JSON from the response
-        let jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || 
-                        text.match(/```\n([\s\S]*?)\n```/) ||
-                        text.match(/{[\s\S]*}/);
         
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[1] || jsonMatch[0]);
-        } else {
-            return JSON.parse(text);
-        }
-        } catch (error) 
-        {
-            console.error('Error validating claim with Gemini:', error);
-            throw new Error('Failed to validate claim');
-        }
+        return safelyParseJSON(text);
+        
+    } catch (error) 
+    {
+        console.error('Error validating claim with Gemini:', error);
+        throw new Error('Failed to validate claim: ' + error.message);
     }
-    export default {
+}
+
+export default {
     analyzeContent,
     validateClaim
 };
