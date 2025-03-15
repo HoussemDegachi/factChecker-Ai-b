@@ -50,7 +50,7 @@ const contentAnalysisSchema = Schema({
         ],
         count: {
             type: Number,
-            required: True
+            required: true
         }
     },
 
@@ -75,7 +75,7 @@ const contentAnalysisSchema = Schema({
             },
             explanation: {
                 type: String,
-                required: True
+                required: true
             },
             source: {
                 type: String,
