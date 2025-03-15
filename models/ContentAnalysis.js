@@ -35,11 +35,6 @@ const contentAnalysisSchema = Schema({
         }
     },
 
-    generalTopic: {
-        type: String,
-        required: true
-    },
-
     topics: {
         categories: [
             {
@@ -81,6 +76,10 @@ const contentAnalysisSchema = Schema({
             explanation: {
                 type: String,
                 required: True
+            },
+            source: {
+                type: String,
+                required: true
             }
         }
     ]
