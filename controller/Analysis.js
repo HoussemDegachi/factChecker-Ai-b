@@ -5,8 +5,8 @@ import { extractYouTubeVideoId } from "../utils/funcs.js"
 
 export const get = async (req, res) => {
     try {
-        const { videoUrl, videoId } = req.body;
-        
+        const { videoId: id } = req.body;
+        const videoUrl = req.params[0]        
         const id = videoId || (videoUrl ? extractYouTubeVideoId(videoUrl) : null);
         
         if (!id) {
