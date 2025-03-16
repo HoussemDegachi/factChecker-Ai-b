@@ -74,15 +74,12 @@ const contentAnalysisSchema = Schema({
             },
             claim: {
                 type: String,
-                required: true
             },
             explanation: {
                 type: String,
-                required: true
             },
             source: {
                 type: String,
-                required: true
             },
             validation: {
                 isValid: Boolean,
