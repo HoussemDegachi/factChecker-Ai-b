@@ -8,27 +8,20 @@ import {
     analyzeLongVideoInBatches 
 } from '../Ai/index.js';
 import { getYtMetaData, extractYouTubeVideoId } from '../utils/funcs.js';
-
 dotenv.config();
-
 if (!process.env.GEMINI_API_KEY) {
     console.error('Error: GEMINI_API_KEY environment variable is not set');
     process.exit(1);
 }
-
 function saveResultsToFile(data, videoId) {
     const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\./g, '-');
     const filename = `analysis_${videoId}_${timestamp}.json`;
-    
     const resultsDir = path.join(process.cwd(), 'analysis_results');
     if (!fs.existsSync(resultsDir)) {
         fs.mkdirSync(resultsDir, { recursive: true });
     }
-    
     const filePath = path.join(resultsDir, filename);
-    
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
-    
     return filePath;
 }
 
@@ -117,7 +110,6 @@ async function testIntegratedAnalysis(videoIdOrUrl) {
         
         const filePath = saveResultsToFile(analysisResult, videoId);
         console.log(`\nComplete analysis results saved to: ${filePath}`);
-        
         return analysisResult;
     } catch (error) {
         console.error('Error testing YouTube analysis:', error);

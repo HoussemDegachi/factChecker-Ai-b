@@ -2,7 +2,7 @@ import ExpressError from "../utils/ExpressError.js"
 import { extractYouTubeVideoId, getYtMetaData } from "../utils/funcs.js"
 
 export const isUrlIdValid = async (req, res, next) => {
-    const { url } = req.params
+    const url = req.params[0]
     const id = extractYouTubeVideoId(url)
 
     if (!url) return next(ExpressError("Url is invalid", 400))
