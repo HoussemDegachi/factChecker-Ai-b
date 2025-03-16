@@ -2,7 +2,11 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { analyzeContent } from '../Ai/index.js'
+import { 
+    analyzeContent, 
+    analyzeContentWithTranscript, 
+    analyzeLongVideoInBatches 
+} from '../Ai/index.js';
 import { getYtMetaData, extractYouTubeVideoId } from '../utils/funcs.js';
 
 dotenv.config();
@@ -42,16 +46,25 @@ async function testIntegratedAnalysis(videoIdOrUrl) {
         const metadata = await getYtMetaData(videoId);
         console.log('Video title:', metadata.title);
         console.log('Video Link:', metadata.author_url);
+        console.log('Video Duration:', metadata.lengthSeconds, 'seconds');
         
-        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        const durationInSeconds = parseInt(metadata.lengthSeconds);
+        let analysisResult;
         
-        console.log('Analyzing content with Gemini including integrated validation...');
-        console.log('This may take a while as the model processes both analysis and validation...');
+        console.log('Analyzing content with Gemini...');
+        console.log('This may take a while as the model processes the video...');
         
         const startTime = Date.now();
-        const analysisResult = await analyzeContent(metadata.title, videoUrl, videoId);
-        const endTime = Date.now();
         
+        if (durationInSeconds > 600) {
+            console.log('Long video detected. Using batch processing...');
+            analysisResult = await analyzeLongVideoInBatches(metadata.title, videoId);
+        } else {
+            console.log('Using transcript-based analysis...');
+            analysisResult = await analyzeContentWithTranscript(metadata.title, videoId);
+        }
+        
+        const endTime = Date.now();
         console.log(`Analysis completed in ${(endTime - startTime) / 1000} seconds`);
         
         console.log('\n--- Analysis Results ---');
@@ -75,7 +88,13 @@ async function testIntegratedAnalysis(videoIdOrUrl) {
         if (analysisResult.timestamps && analysisResult.timestamps.length > 0) {
             console.log(`\n--- Claims and Validations (${analysisResult.timestamps.length} total) ---`);
             
-            analysisResult.timestamps.forEach((timestamp, index) => {
+            const sortedTimestamps = [...analysisResult.timestamps].sort((a, b) => {
+                if (a.timestampInStr === "title") return -1;
+                if (b.timestampInStr === "title") return 1;
+                return (a.timestampInS || 0) - (b.timestampInS || 0);
+            });
+            
+            sortedTimestamps.forEach((timestamp, index) => {
                 console.log(`\nClaim ${index + 1}: "${timestamp.claim}" (${timestamp.label})`);
                 console.log(`Timestamp: ${timestamp.timestampInStr}`);
                 
