@@ -3,7 +3,7 @@ import ContentAnalysis from "../models/ContentAnalysis.js"
 
 export const get = async (req, res) => {
     const { data, id } = req.body
-    const { url } = req.params
+    const url = req.params[0]
 
     const analysis = await ContentAnalysis.findOne({ originalId: id })
 
