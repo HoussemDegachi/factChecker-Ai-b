@@ -1,7 +1,6 @@
 // controller/Analysis.js
 import { analyzeYoutubeVideo } from "../Ai/index.js"
 import ContentAnalysis from "../models/ContentAnalysis.js"
-import { extractYouTubeVideoId } from "../utils/funcs.js"
 
 export const get = async (req, res) => {
 
@@ -14,7 +13,7 @@ export const get = async (req, res) => {
     if (analysis) return res.status(200).json(analysis)
 
     // else create new analysis
-    const analysisResult = await analyzeContent(data.title, url, id);
+    const analysisResult = await analyzeYoutubeVideo(data.title, url, id);
     console.log(analysisResult)
     const newContentAnalysis = new ContentAnalysis(analysisResult)
     await newContentAnalysis.save()
