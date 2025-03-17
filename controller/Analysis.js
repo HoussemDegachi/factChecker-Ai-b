@@ -16,7 +16,7 @@ export const get = async (req, res) => {
     console.log(analysisResult)
     const newContentAnalysis = new ContentAnalysis(analysisResult)
     await newContentAnalysis.save()
-    res.status(200).json(newContentAnalysis)
+    res.status(201).json(newContentAnalysis)
 }
 
 export default {
