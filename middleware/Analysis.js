@@ -10,6 +10,9 @@ export const isUrlIdValid = async (req, res, next) => {
     let data;
     try {
         data = await getYtMetaData(id)
+        console.log("-------------------------")
+        console.log(data)
+        console.log("-------------------------")
     } catch (e) {
         return next(new ExpressError("Video is unavailable", 400))
     }
