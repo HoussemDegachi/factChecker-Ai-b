@@ -13,18 +13,52 @@ const model = genAI.getGenerativeModel({
     }
 });
 
+function validateAndFixTopicsCount(analysisData) {
+    if (!analysisData) return analysisData;
+
+    if (analysisData.topics && Array.isArray(analysisData.topics.categories)) {
+        analysisData.topics.count = analysisData.topics.categories.length;
+    }
+
+    if (analysisData.percentages) {
+        const { falseInformation, verifiedInformation, misleadingInformation } = analysisData.percentages;
+        const sum = (falseInformation || 0) + (verifiedInformation || 0) + (misleadingInformation || 0);
+        
+        if (sum !== 100 && sum > 0) {
+        const adjustment = 100 - sum;
+        
+        const categories = ['falseInformation', 'verifiedInformation', 'misleadingInformation'];
+        let largestCategory = categories[0];
+        
+        categories.forEach(category => {
+            if (analysisData.percentages[category] > analysisData.percentages[largestCategory]) {
+            largestCategory = category;
+            }
+        });
+        
+        analysisData.percentages[largestCategory] += adjustment;
+        
+        analysisData.percentages.falseInformation = Math.round(analysisData.percentages.falseInformation);
+        analysisData.percentages.verifiedInformation = Math.round(analysisData.percentages.verifiedInformation);
+        analysisData.percentages.misleadingInformation = Math.round(analysisData.percentages.misleadingInformation);
+        }
+    }
+
+    return analysisData;
+}
+
 function safelyParseJSON(text) {
-    try {
+        try {
         const jsonBlockMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
         
         let jsonText = jsonBlockMatch ? jsonBlockMatch[1] : text;
         
         try {
             console.log("Attempting to parse JSON directly");
-            return JSON.parse(jsonText);
+            const result = JSON.parse(jsonText);
+            return validateAndFixTopicsCount(result);
         } catch (initialError) {
             console.log("Initial JSON parsing failed, attempting to fix common issues...");
-            
             
             jsonText = jsonText.replace(/'([^']*)'(?=\s*:)/g, '"$1"');
             jsonText = jsonText.replace(/:\s*'([^']*)'/g, ': "$1"');
@@ -34,35 +68,36 @@ function safelyParseJSON(text) {
             jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
             
             try {
-                console.log("Attempting to parse fixed JSON");
-                const parsedObject = JSON.parse(jsonText);
-                console.log("JSON successfully parsed after fixes");
-                return parsedObject;
+            console.log("Attempting to parse fixed JSON");
+            const parsedObject = JSON.parse(jsonText);
+            console.log("JSON successfully parsed after fixes");
+            return validateAndFixTopicsCount(parsedObject);
             } catch (fixError) {
-                console.log("Fixed JSON parsing failed, trying line-by-line reconstruction");
+            console.log("Fixed JSON parsing failed, trying line-by-line reconstruction");
+            
+            try {
+                const stripped = jsonText.replace(/\s+/g, ' ').trim();
                 
-                try {
-                    const stripped = jsonText.replace(/\s+/g, ' ').trim();
-                    
-                    let normalized = stripped.replace(/'/g, '"');
-                    
-                    normalized = normalized.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
-                    
-                    normalized = normalized.replace(/,\s*([}\]])/g, '$1');
-                    
-                    console.log("Attempting to parse normalized JSON");
-                    return JSON.parse(normalized);
-                } catch (reconstructError) {
-                    console.log("All JSON parsing attempts failed, creating fallback object");
-                    
-                    return {
-                        error: "Failed to parse JSON response",
-                        rawResponse: text
-                    };
-                }
+                let normalized = stripped.replace(/'/g, '"');
+                
+                normalized = normalized.replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3');
+                
+                normalized = normalized.replace(/,\s*([}\]])/g, '$1');
+                
+                console.log("Attempting to parse normalized JSON");
+                const parsedResult = JSON.parse(normalized);
+                return validateAndFixTopicsCount(parsedResult);
+            } catch (reconstructError) {
+                console.log("All JSON parsing attempts failed, creating fallback object");
+                
+                return {
+                error: "Failed to parse JSON response",
+                rawResponse: text
+                };
+            }
             }
         }
-    } catch (error) {
+        } catch (error) {
         console.error("Error in safelyParseJSON:", error);
         return {
             error: "Error parsing JSON response",
@@ -120,6 +155,17 @@ export async function analyzeContent(title, content, originalId) {
                 ]
             }
             }
+        ],
+        "educationalRecommendations": [
+            {
+                "title": "Title of the educational resource",
+                "description": "Brief description of what this resource offers and why it's helpful",
+                "url": "A valid and working URL to the resource",
+                "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
+                "authorOrPublisher": "Name of the author or publishing organization",
+                "credibilityScore": 1-10 (credibility rating where 10 is most credible),
+                "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
+            }
         ]
         }
         
@@ -133,17 +179,24 @@ export async function analyzeContent(title, content, originalId) {
         6. For each reference, assign a credibility score from 1-10 based on source reputation, author credentials, recency, and factual accuracy.
         7. References should be specific (not just "Wikipedia" but the specific article).
         8. Prioritize academic sources, government publications, peer-reviewed research, and established news organizations known for factual reporting.
-        9. avoid null values unless it is mentioned to do so
-        10. dates must be provided in a way that makes them castable by Mongodb
+        9. Avoid null values unless it is mentioned to do so
+        10. Dates must be provided in a way that makes them castable by MongoDB
         11. All fields are required
         12. You must at least mention one reference, the only exception is the title It can have no reference
-        13. ensure that you are using correct types and values
-        14. you must analyze all claims provided by the video
-        15: the alphanumerique value provided after content is the youtube id of the video that should be analyzed
+        13. Ensure that you are using correct types and values
+        14. You must analyze all claims provided by the video
+        15: The alphanumeric value provided after content is the youtube id of the video that should be analyzed
         16. The title can be only analyzed once
         17. IMPORTANT: Be thorough in analyzing all important claims in the video. For videos longer than 5 minutes, aim to identify at least 8-10 distinct claims with timestamps. For shorter videos, aim to identify at least 5-6 claims. Ensure you capture both correct and incorrect claims.
         18. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
         19. Evenly distribute your analysis across the video timeline.
+        20. EDUCATIONAL RECOMMENDATIONS: Provide 3-5 high-quality educational resources relevant to the video's main topics. These should be:
+           a. From reputable sources (universities, established educational platforms, government agencies, etc.)
+           b. Directly relevant to the video's main topics and claims
+           c. Varied in format (mix of articles, videos, courses when possible)
+           d. With working, valid URLs
+           e. With accurate descriptions of what the learner will gain
+           f. Resources should help viewers better understand the truth about any misleading claims in the video
         
         DO NOT USE CODE BLOCKS AROUND THE JSON. RETURN ONLY THE CLEAN JSON OBJECT WITHOUT ANY FORMATTING OR CODE BLOCKS.
         `;
@@ -156,12 +209,125 @@ export async function analyzeContent(title, content, originalId) {
 
         analysisData.originalId = originalId;
 
+        if (!analysisData.educationalRecommendations || !Array.isArray(analysisData.educationalRecommendations) || analysisData.educationalRecommendations.length === 0) {
+            console.log("No educational recommendations found in initial analysis. Generating them separately...");
+            const recommendations = await generateEducationalRecommendations(analysisData);
+            analysisData.educationalRecommendations = recommendations;
+        }
+
+        if (analysisData.educationalRecommendations && Array.isArray(analysisData.educationalRecommendations)) {
+            analysisData.educationalRecommendations = analysisData.educationalRecommendations.filter(rec => {
+                return rec.url && /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(rec.url);
+            });
+        }
+
         return analysisData;
 
     } catch (error) {
         console.error('Error analyzing content with Gemini: ', error);
         throw new Error('Failed to analyze content: ' + error.message);
     }
+}
+
+async function generateEducationalRecommendations(analysisData) {
+    try {
+        const generalTopic = analysisData.generalTopic || '';
+        
+        const subtopics = analysisData.topics && analysisData.topics.categories 
+            ? analysisData.topics.categories.map(cat => cat.title).join(', ')
+            : '';
+        
+        const keyClaims = analysisData.timestamps 
+            ? analysisData.timestamps
+                .filter(ts => ts.label === 'False' || ts.label === 'Misleading')
+                .map(ts => ts.claim)
+                .join('; ')
+            : '';
+            
+        const prompt = `Generate 3-5 high-quality educational recommendations for someone who wants to learn more about "${generalTopic}".
+        
+        Subtopics mentioned: ${subtopics}
+        
+        Key claims that need educational context: ${keyClaims}
+        
+        Return the recommendations in this JSON format:
+        [
+            {
+                "title": "Title of the educational resource",
+                "description": "Brief description of what this resource offers and why it's helpful",
+                "url": "A valid and working URL to the resource",
+                "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
+                "authorOrPublisher": "Name of the author or publishing organization",
+                "credibilityScore": 1-10 (credibility rating where 10 is most credible),
+                "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
+            }
+        ]
+        
+        IMPORTANT:
+        1. Only include REAL resources with VALID URLs from reputable sources
+        2. Focus on educational resources from universities, established educational platforms, government agencies, etc.
+        3. Include a mix of resource types (articles, videos, courses, etc.)
+        4. Make sure URLs are correct and working
+        5. Make descriptions specific about what the learner will gain
+        6. Ensure high relevance to the topic and especially to correct misconceptions from the video
+        7. Do not include resources that might spread misinformation
+        8. Only assign high credibility scores (8-10) to resources from the most authoritative sources
+        
+        Return ONLY the JSON array with no explanatory text, markdown formatting, or code blocks.`;
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        
+        try {
+            return JSON.parse(text);
+        } catch (error) {
+            const jsonMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
+            if (jsonMatch && jsonMatch[1]) {
+                return JSON.parse(jsonMatch[1]);
+            }
+            
+            console.error('Failed to parse educational recommendations:', error);
+            return createDefaultRecommendations(generalTopic);
+        }
+    } catch (error) {
+        console.error('Error generating educational recommendations:', error);
+        return createDefaultRecommendations(analysisData.generalTopic || '');
+    }
+}
+
+function createDefaultRecommendations(topic) {
+    const sanitizedTopic = topic.replace(/[^\w\s]/gi, '').trim() || 'General Knowledge';
+    
+    return [
+        {
+            title: `${sanitizedTopic} - Khan Academy`,
+            description: `Khan Academy's comprehensive resources on ${sanitizedTopic} with structured lessons and practice exercises.`,
+            url: "https://www.khanacademy.org/",
+            type: "Course",
+            authorOrPublisher: "Khan Academy",
+            credibilityScore: 9,
+            relevantTopics: [sanitizedTopic, "Education", "Online Learning"]
+        },
+        {
+            title: `${sanitizedTopic} on MIT OpenCourseWare`,
+            description: `Free course materials from MIT professors on topics related to ${sanitizedTopic}.`,
+            url: "https://ocw.mit.edu/",
+            type: "Course",
+            authorOrPublisher: "Massachusetts Institute of Technology",
+            credibilityScore: 10,
+            relevantTopics: [sanitizedTopic, "Academic Research", "Higher Education"]
+        },
+        {
+            title: `${sanitizedTopic} Research - Google Scholar`,
+            description: `Find peer-reviewed papers and scholarly articles about ${sanitizedTopic} for in-depth understanding.`,
+            url: "https://scholar.google.com/",
+            type: "Research Paper",
+            authorOrPublisher: "Google Scholar",
+            credibilityScore: 8,
+            relevantTopics: [sanitizedTopic, "Academic Research", "Scholarly Articles"]
+        }
+    ];
 }
 
 export async function analyzeYoutubeVideo(videoId) {
@@ -253,10 +419,21 @@ async function analyzeVideoWithoutTranscript(title, videoId) {
             ]
             }
         }
+        ],
+        "educationalRecommendations": [
+        {
+            "title": "Title of the educational resource",
+            "description": "Brief description of what this resource offers and why it's helpful",
+            "url": "A valid and working URL to the resource",
+            "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
+            "authorOrPublisher": "Name of the author or publishing organization",
+            "credibilityScore": 1-10 (credibility rating where 10 is most credible),
+            "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
+        }
         ]
     }
         
-        IMPORTANT: Even though there is no transcript, YOU MUST provide a thorough analysis with at least 5-10 specific claims and timestamps throughout the video. Base the timestamps on your knowledge of where key claims appear in the video. Ensure all percentages add up to 100%.
+        IMPORTANT: Even though there is no transcript, YOU MUST provide a thorough analysis with at least 5-10 specific claims and timestamps throughout the video. Base the timestamps on your knowledge of where key claims appear in the video. Ensure all percentages add up to 100%. Include 3-5 high-quality educational recommendations from reputable sources that are directly relevant to the video's topic.
         
         DO NOT USE CODE BLOCKS AROUND THE JSON. RETURN ONLY THE CLEAN JSON OBJECT WITHOUT ANY FORMATTING OR CODE BLOCKS.`;
         
@@ -333,6 +510,7 @@ function splitTranscriptIntoSegments(transcript, totalDurationInSeconds) {
 }
 
 function combineAnalysisResults(title, batchResults, videoId) {
+    // Initialize combined result structure
     const combinedResult = {
         conclusion: "",
         percentages: {
@@ -341,57 +519,253 @@ function combineAnalysisResults(title, batchResults, videoId) {
             verifiedInformation: 0,
             misleadingInformation: 0
         },
-        generalTopic: batchResults[0].generalTopic,
+        generalTopic: determineMainTopic(batchResults),
         topics: {
             categories: [],
             count: 0
         },
         timestamps: [],
-        originalId: videoId
+        originalId: videoId,
+        educationalRecommendations: []
     };
     
-    batchResults.forEach(batch => {
-        if (batch.timestamps) {
-            combinedResult.timestamps = [...combinedResult.timestamps, ...batch.timestamps];
-        }
-    });
+    // Merge timestamps from all batches
+    combinedResult.timestamps = batchResults.flatMap(batch => 
+        batch.timestamps ? batch.timestamps : []
+    );
     
+    // Handle duplicate title entries
+    const titleEntries = combinedResult.timestamps.filter(
+        entry => entry.timestampInStr === "title"
+    );
+    
+    // If multiple title entries exist, keep only the most comprehensive one
+    if (titleEntries.length > 1) {
+        // Remove all title entries
+        combinedResult.timestamps = combinedResult.timestamps.filter(
+            entry => entry.timestampInStr !== "title"
+        );
+        
+        // Find the most detailed title entry (one with longest explanation)
+        const mostDetailedEntry = titleEntries.reduce((best, current) => {
+            const bestLength = best.explanation ? best.explanation.length : 0;
+            const currentLength = current.explanation ? current.explanation.length : 0;
+            return currentLength > bestLength ? current : best;
+        }, titleEntries[0]);
+        
+        // Add the most comprehensive title entry at the beginning
+        combinedResult.timestamps.unshift(mostDetailedEntry);
+    }
+    
+    // Process and combine topics
     const topicMap = new Map();
+    
     batchResults.forEach(batch => {
+        // Ensure each batch has correct topic count before combining
+        batch = validateAndFixTopicsCount(batch);
+        
         if (batch.topics && batch.topics.categories) {
             batch.topics.categories.forEach(category => {
+                const count = Number(category.count) || 0;
+                
                 if (topicMap.has(category.title)) {
-                    topicMap.set(category.title, topicMap.get(category.title) + category.count);
+                    topicMap.set(category.title, topicMap.get(category.title) + count);
                 } else {
-                    topicMap.set(category.title, category.count);
+                    topicMap.set(category.title, count);
                 }
             });
         }
     });
     
-    combinedResult.topics.categories = Array.from(topicMap.entries()).map(([title, count]) => ({
-        title,
-        count
-    }));
+    // Convert topic map to array and sort by count (descending)
+    combinedResult.topics.categories = Array.from(topicMap.entries())
+        .map(([title, count]) => ({ title, count }))
+        .sort((a, b) => b.count - a.count);
     
+    // Set the count as the number of unique categories
     combinedResult.topics.count = combinedResult.topics.categories.length;
     
+    // Calculate combined percentages
     let totalBatches = batchResults.length;
     batchResults.forEach(batch => {
-        combinedResult.percentages.overall += batch.percentages.overall / totalBatches;
-        combinedResult.percentages.falseInformation += batch.percentages.falseInformation / totalBatches;
-        combinedResult.percentages.verifiedInformation += batch.percentages.verifiedInformation / totalBatches;
-        combinedResult.percentages.misleadingInformation += batch.percentages.misleadingInformation / totalBatches;
+        if (batch.percentages) {
+            combinedResult.percentages.overall += (batch.percentages.overall || 0) / totalBatches;
+            combinedResult.percentages.falseInformation += (batch.percentages.falseInformation || 0) / totalBatches;
+            combinedResult.percentages.verifiedInformation += (batch.percentages.verifiedInformation || 0) / totalBatches;
+            combinedResult.percentages.misleadingInformation += (batch.percentages.misleadingInformation || 0) / totalBatches;
+        }
     });
     
+    // Round percentages
     combinedResult.percentages.overall = Math.round(combinedResult.percentages.overall);
     combinedResult.percentages.falseInformation = Math.round(combinedResult.percentages.falseInformation);
     combinedResult.percentages.verifiedInformation = Math.round(combinedResult.percentages.verifiedInformation);
     combinedResult.percentages.misleadingInformation = Math.round(combinedResult.percentages.misleadingInformation);
     
-    combinedResult.conclusion = `This video about ${combinedResult.generalTopic} contains ${combinedResult.timestamps.length} notable claims. Overall, it is ${combinedResult.percentages.overall}% accurate with ${combinedResult.percentages.falseInformation}% false information and ${combinedResult.percentages.misleadingInformation}% misleading content.`;
+    // Ensure percentages (excluding overall) sum to 100%
+    const sum = combinedResult.percentages.falseInformation + 
+                combinedResult.percentages.verifiedInformation + 
+                combinedResult.percentages.misleadingInformation;
     
-    return combinedResult;
+    if (sum !== 100) {
+        // Adjust the largest value to make the sum 100%
+        const diff = 100 - sum;
+        const categories = ['falseInformation', 'verifiedInformation', 'misleadingInformation'];
+        const largestCategory = categories.reduce((a, b) => 
+            combinedResult.percentages[a] > combinedResult.percentages[b] ? a : b
+        );
+        combinedResult.percentages[largestCategory] += diff;
+    }
+    
+    // Combine educational recommendations from all segments
+    // Use a map to deduplicate by URL
+    const recommendationsMap = new Map();
+    
+    batchResults.forEach(batch => {
+        if (batch.educationalRecommendations && Array.isArray(batch.educationalRecommendations)) {
+            batch.educationalRecommendations.forEach(rec => {
+                if (rec.url && !recommendationsMap.has(rec.url)) {
+                    recommendationsMap.set(rec.url, rec);
+                }
+            });
+        }
+    });
+    
+    // Convert recommendationsMap to array and take the top 5 recommendations
+    const allRecommendations = Array.from(recommendationsMap.values());
+    // Sort by credibility score (descending)
+    allRecommendations.sort((a, b) => (b.credibilityScore || 0) - (a.credibilityScore || 0));
+    
+    // Take up to 5 recommendations
+    combinedResult.educationalRecommendations = allRecommendations.slice(0, 5);
+    
+    // If we have too few recommendations, generate more based on the combined topic
+    if (combinedResult.educationalRecommendations.length < 3) {
+        // Use the generateEducationalRecommendations function to get more recommendations
+        generateEducationalRecommendations(combinedResult)
+            .then(newRecommendations => {
+                // Add unique new recommendations
+                if (Array.isArray(newRecommendations)) {
+                    newRecommendations.forEach(rec => {
+                        if (rec.url && !recommendationsMap.has(rec.url)) {
+                            recommendationsMap.set(rec.url, rec);
+                            combinedResult.educationalRecommendations.push(rec);
+                        }
+                    });
+                    
+                    // Limit to 5 recommendations total
+                    combinedResult.educationalRecommendations = combinedResult.educationalRecommendations.slice(0, 5);
+                }
+            });
+    }
+    
+    // Generate a conclusion
+    combinedResult.conclusion = generateConclusion(combinedResult);
+    
+    // Final validation to ensure everything is properly formatted
+    return validateAndFixTopicsCount(combinedResult);
+}
+
+function validateEducationalRecommendations(recommendations) {
+    if (!recommendations || !Array.isArray(recommendations)) {
+        return [];
+    }
+    
+    return recommendations.filter(rec => {
+        if (!rec.title || !rec.description || !rec.url || !rec.type || !rec.authorOrPublisher) {
+            return false;
+        }
+        
+        const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+        if (!urlPattern.test(rec.url)) {
+            return false;
+        }
+        
+        if (typeof rec.credibilityScore !== 'number' || rec.credibilityScore < 1 || rec.credibilityScore > 10) {
+            rec.credibilityScore = 7; 
+        }
+        
+        if (!Array.isArray(rec.relevantTopics) || rec.relevantTopics.length === 0) {
+            rec.relevantTopics = ["General Knowledge"];
+        }
+        
+        return true;
+    });
+}
+
+function determineMainTopic(batchResults) {
+    const topicFrequency = new Map();
+    
+    batchResults.forEach(batch => {
+        if (batch.generalTopic) {
+            const count = topicFrequency.get(batch.generalTopic) || 0;
+            topicFrequency.set(batch.generalTopic, count + 1);
+        }
+    });
+    
+    let maxCount = 0;
+    let mainTopic = batchResults[0]?.generalTopic || "Unknown Topic";
+    
+    for (const [topic, count] of topicFrequency.entries()) {
+        if (count > maxCount) {
+            maxCount = count;
+            mainTopic = topic;
+        }
+    }
+    
+    return mainTopic;
+}
+
+
+function prioritizeEducationalTopics(analysisData) {
+    const topics = new Set([analysisData.generalTopic]);
+    
+    if (analysisData.topics && analysisData.topics.categories) {
+        analysisData.topics.categories.forEach(category => {
+            topics.add(category.title);
+        });
+    }
+    
+    if (analysisData.timestamps) {
+        analysisData.timestamps
+            .filter(ts => ts.label === 'False' || ts.label === 'Misleading')
+            .forEach(ts => {
+                const text = `${ts.claim} ${ts.explanation}`;
+                const words = text.split(/\s+/);
+                
+                for (let i = 0; i < words.length - 1; i++) {
+                    if (/^[A-Z]/.test(words[i]) && /^[A-Z]/.test(words[i+1])) {
+                        topics.add(`${words[i]} ${words[i+1]}`);
+                    }
+                }
+                
+                words.forEach(word => {
+                    if (/^[A-Z][a-z]{3,}$/.test(word)) {
+                        topics.add(word);
+                    }
+                });
+            });
+    }
+    
+    return Array.from(topics);
+}
+
+function generateConclusion(result) {
+    const claimCounts = {
+        correct: 0,
+        false: 0,
+        misleading: 0
+    };
+    
+    result.timestamps.forEach(item => {
+        if (item.label === "Correct") claimCounts.correct++;
+        else if (item.label === "False") claimCounts.false++;
+        else if (item.label === "Misleading") claimCounts.misleading++;
+    });
+    
+    const totalClaims = claimCounts.correct + claimCounts.false + claimCounts.misleading;
+    
+    return `This video about ${result.generalTopic} contains ${totalClaims} notable claims. Overall, it is ${result.percentages.overall}% accurate with ${result.percentages.falseInformation}% false information and ${result.percentages.misleadingInformation}% misleading content.`;
 }
 
 function formatTime(seconds) {
@@ -403,5 +777,9 @@ function formatTime(seconds) {
 export default {
     analyzeContent,
     analyzeYoutubeVideo,
-    analyzeLongVideoInBatches
+    analyzeLongVideoInBatches,
+    validateAndFixTopicsCount,
+    combineAnalysisResults,
+    generateEducationalRecommendations,
+    validateEducationalRecommendations
 };
