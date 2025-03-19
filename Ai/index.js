@@ -6,7 +6,7 @@ import { getYtMetaData } from '../utils/funcs.js';
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-pro",
+    model: "gemini-2.0-flash",
     generationConfig: {
         temperature: 0.2,  // Lower temperature for more factual responses
         maxOutputTokens: 8192  // Increase token limit if available
@@ -104,6 +104,347 @@ function safelyParseJSON(text) {
             rawResponse: text
         };
     }
+}
+
+export async function printTranscriptWithTimestamps(videoId) {
+    try {
+        const transcriptResult = await getYoutubeTranscript(videoId);
+        if (!transcriptResult || !transcriptResult.text || !transcriptResult.isRealTranscript) {
+            console.log('No transcript available for this video');
+            return;
+        }
+        
+        console.log('='.repeat(50));
+        console.log(`TRANSCRIPT FOR VIDEO ${videoId}`);
+        console.log('='.repeat(50));
+        
+        const lines = transcriptResult.text.split('\n');
+        
+        for (const line of lines) {
+            if (line.trim()) {
+            console.log(line);
+            }
+        }
+        
+        console.log('='.repeat(50));
+        console.log('END OF TRANSCRIPT');
+        console.log('='.repeat(50));
+        
+        const timestamps = [];
+        const timestampRegex = /\[(\d{2}):(\d{2})\]/;
+        
+        for (const line of lines) {
+            const match = line.match(timestampRegex);
+            if (match) {
+            const minutes = parseInt(match[1], 10);
+            const seconds = parseInt(match[2], 10);
+            const timeInSeconds = minutes * 60 + seconds;
+            timestamps.push({
+                timestamp: `${match[1]}:${match[2]}`,
+                seconds: timeInSeconds,
+                text: line.replace(timestampRegex, '').trim()
+            });
+            }
+        }
+        
+        console.log('\nTIMESTAMP SUMMARY:');
+        console.log('-'.repeat(50));
+        
+        for (const entry of timestamps) {
+            console.log(`${entry.timestamp} (${entry.seconds}s): ${entry.text.substring(0, 50)}${entry.text.length > 50 ? '...' : ''}`);
+        }
+        
+        return {
+            fullTranscript: transcriptResult.text,
+            timestamps: timestamps
+        };
+        
+        } catch (error) {
+            console.error('Error printing transcript:', error);
+    }
+}
+
+export async function validateTimestamps(analysisData, videoId) {
+    try {
+        const transcriptResult = await getYoutubeTranscript(videoId);
+        
+        if (!transcriptResult || !transcriptResult.text || !transcriptResult.isRealTranscript) {
+            console.log("No usable transcript available for timestamp validation");
+            return analysisData;
+        }
+        
+        const segments = extractSegmentsFromTranscript(transcriptResult.text);
+        
+        if (!segments || segments.length === 0) {
+            console.log("Could not extract segments from transcript");
+            return analysisData;
+        }
+        
+        console.log(`Extracted ${segments.length} timestamped segments from transcript`);
+        
+        if (analysisData.timestamps && analysisData.timestamps.length) {
+            let correctionCount = 0;
+            
+            for (let i = 0; i < analysisData.timestamps.length; i++) {
+                const claim = analysisData.timestamps[i];
+                
+                if (claim.timestampInStr === "title" || claim.timestampInS === null) {
+                    continue;
+                }
+                
+                const correctedTimestamp = findActualTimestampForClaim(
+                    claim.claim,
+                    segments,
+                    claim.timestampInS
+                );
+                
+                if (correctedTimestamp && 
+                    Math.abs(correctedTimestamp.seconds - claim.timestampInS) > 10) { 
+                    
+                    console.log(`Correcting timestamp for claim: "${claim.claim.substring(0, 50)}..."`);
+                    console.log(`Original: ${claim.timestampInS}s (${claim.timestampInStr})`);
+                    console.log(`Corrected: ${correctedTimestamp.seconds}s (${formatTimeFromSeconds(correctedTimestamp.seconds)})`);
+                    
+                    claim.timestampInS = correctedTimestamp.seconds;
+                    claim.timestampInStr = formatTimeFromSeconds(correctedTimestamp.seconds);
+                    correctionCount++;
+                }
+            }
+            
+            console.log(`Timestamp validation complete. Corrected ${correctionCount} timestamps.`);
+        }
+        
+        return analysisData;
+    } catch (error) {
+        console.error('Error validating timestamps:', error);
+        return analysisData; 
+    }
+}
+
+function extractSegmentsFromTranscript(transcriptText) {
+    if (!transcriptText) return [];
+    
+    const segments = [];
+    const lines = transcriptText.split('\n');
+    
+    const timestampRegex = /\[(\d{2}):(\d{2})\]\s*(.*)/;
+    
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        const match = line.match(timestampRegex);
+        
+        if (match) {
+            const minutes = parseInt(match[1], 10);
+            const seconds = parseInt(match[2], 10);
+            const timeInSeconds = minutes * 60 + seconds;
+            const text = match[3] || "";
+            
+            segments.push({
+                start: timeInSeconds,
+                end: timeInSeconds + 10, 
+                text: text,
+                searchText: text.toLowerCase()
+            });
+        }
+    }
+    
+    for (let i = 0; i < segments.length - 1; i++) {
+        segments[i].end = segments[i + 1].start;
+    }
+    
+    return segments;
+}
+
+function formatTimeFromSeconds(totalSeconds) {
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function createTranscriptTimeMap(transcript, timestamps) {
+    const segments = [];
+    
+    for (let i = 0; i < timestamps.length; i++) {
+        const start = timestamps[i].time;
+        const end = (i < timestamps.length - 1) ? timestamps[i + 1].time : start + 10;
+        const text = timestamps[i].text;
+        
+        segments.push({
+            start,
+            end,
+            text,
+            searchText: text.toLowerCase()
+        });
+    }
+    
+    return segments;
+}
+
+function findActualTimestampForClaim(claim, segments, originalTimestamp) {
+    if (!claim || typeof claim !== 'string' || !segments || segments.length === 0) return null;
+    
+    const searchTerms = extractKeywordsFromClaim(claim);
+    
+    const windowSize = 120; 
+    const nearbyMatches = findExactMatches(
+        claim, 
+        segments, 
+        Math.max(0, originalTimestamp - windowSize),
+        originalTimestamp + windowSize
+    );
+    
+    if (nearbyMatches.length > 0) {
+        nearbyMatches.sort((a, b) => 
+            Math.abs(a.start - originalTimestamp) - Math.abs(b.start - originalTimestamp)
+        );
+        
+        return { 
+            seconds: nearbyMatches[0].start,
+            confidence: 'high'
+        };
+    }
+    
+    const nearbyKeywordMatches = findKeywordMatches(
+        searchTerms, 
+        segments,
+        Math.max(0, originalTimestamp - windowSize),
+        originalTimestamp + windowSize
+    );
+    
+    if (nearbyKeywordMatches.length > 0) {
+        nearbyKeywordMatches.sort((a, b) => {
+            if (Math.abs(b.score - a.score) > 0.3) {
+                return b.score - a.score;
+            } else {
+                return Math.abs(a.start - originalTimestamp) - Math.abs(b.start - originalTimestamp);
+            }
+        });
+        
+        return {
+            seconds: nearbyKeywordMatches[0].start,
+            confidence: nearbyKeywordMatches[0].score > 0.7 ? 'medium' : 'low'
+        };
+    }
+    
+    const allMatches = findExactMatches(claim, segments, 0, Infinity);
+    if (allMatches.length > 0) {
+        return {
+            seconds: allMatches[0].start,
+            confidence: 'medium'
+        };
+    }
+    
+    const allKeywordMatches = findKeywordMatches(searchTerms, segments, 0, Infinity);
+    if (allKeywordMatches.length > 0) {
+        allKeywordMatches.sort((a, b) => b.score - a.score);
+        
+        return {
+            seconds: allKeywordMatches[0].start,
+            confidence: 'low'
+        };
+    }
+    
+    return null;
+}
+
+function extractKeywordsFromClaim(claim) {
+    const text = claim.toLowerCase();
+    
+    const stopWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'is', 'are', 'was', 'were',
+                    'that', 'this', 'these', 'those', 'it', 'they', 'them', 'their', 'we', 'our', 'you', 'your', 'he', 'she', 'his', 'her'];
+    
+    const words = text
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, '')
+        .split(' ')
+        .filter(word => word.length > 3 && !stopWords.includes(word));
+    
+    words.sort((a, b) => b.length - a.length);
+    
+    return words.slice(0, 5);
+}
+
+function findExactMatches(claim, segments, startTime, endTime) {
+    if (!claim || !segments || segments.length === 0) return [];
+    
+    const cleanClaim = claim.toLowerCase().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ').trim();
+    const matches = [];
+    
+    for (const segment of segments) {
+        if (!segment || typeof segment.start !== 'number' || !segment.searchText) continue;
+        
+        if (segment.start >= startTime && segment.start <= endTime) {
+            const cleanSegment = segment.searchText.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ').trim();
+            
+            const similarity = calculateSimilarity(cleanSegment, cleanClaim);
+            
+            if (cleanSegment.includes(cleanClaim) || 
+                cleanClaim.includes(cleanSegment) ||
+                similarity > 0.6) {
+                
+                matches.push({
+                    ...segment,
+                    score: similarity
+                });
+            }
+        }
+    }
+    
+    return matches.sort((a, b) => b.score - a.score);
+}
+
+function findKeywordMatches(keywords, segments, startTime = 0, endTime = Infinity) {
+    if (!keywords || !keywords.length || !segments || segments.length === 0) return [];
+    
+    const matches = [];
+    
+    for (const segment of segments) {
+        if (!segment || typeof segment.start !== 'number' || !segment.searchText) continue;
+        if (segment.start < startTime || segment.start > endTime) continue;
+        
+        let matchScore = 0;
+        let matchedKeywords = 0;
+        
+        for (const keyword of keywords) {
+            if (segment.searchText.includes(keyword)) {
+                matchedKeywords++;
+                matchScore += (keyword.length / 4) / keywords.length;
+            }
+        }
+        
+        const minMatches = keywords.length <= 2 ? 1 : 2;
+        
+        if (matchedKeywords >= minMatches) {
+            matches.push({
+                start: segment.start,
+                text: segment.text,
+                score: matchScore
+            });
+        }
+    }
+    
+    return matches;
+}
+
+function calculateSimilarity(text1, text2) {
+    if (!text1 || !text2) return 0;
+    
+    const words1 = text1.split(' ').filter(w => w.length > 0);
+    const words2 = text2.split(' ').filter(w => w.length > 0);
+    
+    const set1 = new Set(words1);
+    const set2 = new Set(words2);
+    
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    
+    if (set1.size === 0 || set2.size === 0) return 0;
+    
+    if (intersection.size === set1.size || intersection.size === set2.size) {
+        return Math.min(1.0, (intersection.size / Math.min(set1.size, set2.size)) * 1.2);
+    }
+    
+    return intersection.size / (set1.size + set2.size - intersection.size);
 }
 
 export async function analyzeContent(title, content, originalId) {
@@ -339,8 +680,11 @@ export async function analyzeYoutubeVideo(videoId) {
         console.log('Parsed duration in seconds:', parseInt(metadata.lengthSeconds || "0"));
         
         const transcriptResult = await getYoutubeTranscript(videoId);
-        const { text: transcript, isRealTranscript } = transcriptResult;
-        
+
+        // const { text: transcript, isRealTranscript } = transcriptResult;
+        const { text: transcript, isRealTranscript } = transcriptResult || { text: null, isRealTranscript: false };
+        await printTranscriptWithTimestamps(videoId);
+
         const durationInSeconds = parseInt(metadata.lengthSeconds || "0");
         
         console.log('Checking batch processing conditions:');
@@ -349,19 +693,37 @@ export async function analyzeYoutubeVideo(videoId) {
         console.log('- transcript exists:', Boolean(transcript));
         console.log(`Video length (~ ${Math.floor(durationInSeconds / 60)} minutes).`);
         
+        let analysisData;
+
         if (isRealTranscript && durationInSeconds > 300 && transcript) {
             console.log(`Processing long video (~ ${Math.floor(durationInSeconds / 60)} minutes) with transcript in batches...`);
-            return analyzeLongVideoInBatches(title, videoId, transcript, durationInSeconds);
+            analysisData = await analyzeLongVideoInBatches(title, videoId, transcript, durationInSeconds);
         }
         
-        if (!isRealTranscript || !transcript) {
+        else if (!isRealTranscript || !transcript) {
             console.log("No transcript available, analyzing video directly");
-            return analyzeVideoWithoutTranscript(title, videoId);
+            analysisData = await analyzeVideoWithoutTranscript(title, videoId);
         }
-        
-        console.log("Using normal transcript analysis");
-        return analyzeContent(title, transcript, videoId);
-        
+        else {
+            console.log("Using normal transcript analysis");
+            analysisData = await analyzeContent(title, transcript, videoId);
+        }
+
+        if (analysisData && analysisData.timestamps && analysisData.timestamps.length > 0) {
+            try {
+                if (transcriptResult && transcriptResult.isRealTranscript && transcriptResult.text) {
+                    console.log("Running timestamp validation...");
+                    analysisData = await validateTimestamps(analysisData, videoId);
+                } else {
+                    console.log("Skipping timestamp validation - no transcript available");
+                }
+            } catch (validationError) {
+                console.error('Failed to validate timestamps, continuing with original analysis:', validationError);
+            }
+        }
+
+        return analysisData;
+
     } catch (error) {
         console.error('Error in video analysis:', error);
         throw error;
