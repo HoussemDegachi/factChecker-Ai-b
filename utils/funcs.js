@@ -46,6 +46,16 @@ export async function getYtMetaData(videoId) {
 
 }
 
+export function doesYtIdExist(id) {
+    try {
+        const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+        return true
+    } catch (e) {
+        return false
+    }
+
+}
+
 function isoDurationToSeconds(isoDuration) {
     const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
 
@@ -93,5 +103,6 @@ export function extractYouTubeVideoId(url) {
 
 export default {
     getYtMetaData,
-    extractYouTubeVideoId
+    extractYouTubeVideoId,
+    doesYtIdExist
 }
