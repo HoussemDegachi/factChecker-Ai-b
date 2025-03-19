@@ -144,6 +144,10 @@ export async function analyzeContent(title, content, originalId) {
         17. IMPORTANT: Be thorough in analyzing all important claims in the video. For videos longer than 5 minutes, aim to identify at least 8-10 distinct claims with timestamps. For shorter videos, aim to identify at least 5-6 claims. Ensure you capture both correct and incorrect claims.
         18. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
         19. Evenly distribute your analysis across the video timeline.
+        20. Make sure that timestamps match what is in the video
+            a. Timestamps's claim matches what was said or displayed
+            b. Timestamp's timestampInS matches the correct time it was said or displayed in seconds
+            c. Timestamp's timestampInS cannot be longer then the video
         
         DO NOT USE CODE BLOCKS AROUND THE JSON. RETURN ONLY THE CLEAN JSON OBJECT WITHOUT ANY FORMATTING OR CODE BLOCKS.
         `;
