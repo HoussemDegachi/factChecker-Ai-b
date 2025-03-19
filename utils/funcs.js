@@ -46,9 +46,10 @@ export async function getYtMetaData(videoId) {
 
 }
 
-export function doesYtIdExist(id) {
+export async function doesYtIdExist(id) {
     try {
-        const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+        const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`;
+        const oembedResponse = await axios.get(oembedUrl);
         return true
     } catch (e) {
         return false
