@@ -19,7 +19,9 @@ export async function getYtMetaData(videoId) {
 
     const apiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails,statistics,snippet&key=${apiKey}`;
 
-    const apiResponse = await axios.get(apiUrl).catch((err) => console.error(err.message));
+    const apiResponse = await axios.get(apiUrl).catch((err) => {console.error(err.message)
+        throw new ExpressError("Unable to call YoutubeApi")
+    });
 
     if (apiResponse.data.items && apiResponse.data.items.length > 0) {
         const videoData = apiResponse.data.items[0];
