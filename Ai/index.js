@@ -474,7 +474,7 @@ export async function analyzeContent(title, content, originalId) {
         },
         "timestamps": [
             {
-            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title,
+            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length and must be when was 'claim' said in the video,
             "timestampInStr": "time stamp in the format hh:mm:ss where hh is not mentioned if it is 00, you are allowed to say title instead of hh:mm:ss in case you are analysing the title",
             "label": "Correct" or "False" or "Misleading",
             "claim": "The specific claim made",
@@ -497,17 +497,6 @@ export async function analyzeContent(title, content, originalId) {
             }
             }
         ],
-        "educationalRecommendations": [
-            {
-                "title": "Title of the educational resource",
-                "description": "Brief description of what this resource offers and why it's helpful",
-                "url": "A valid and working URL to the resource",
-                "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
-                "authorOrPublisher": "Name of the author or publishing organization",
-                "credibilityScore": 1-10 (credibility rating where 10 is most credible),
-                "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
-            }
-        ]
         }
         
 
@@ -532,9 +521,6 @@ export async function analyzeContent(title, content, originalId) {
         18. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
         19. Evenly distribute your analysis across the video timeline.
         20. Make sure that timestamps match what is in the video
-            a. Timestamps's claim matches what was said or displayed
-            b. Timestamp's timestampInS matches the correct time it was said or displayed in seconds
-            c. Timestamp's timestampInS cannot be longer then the video
         
         DO NOT USE CODE BLOCKS AROUND THE JSON. RETURN ONLY THE CLEAN JSON OBJECT WITHOUT ANY FORMATTING OR CODE BLOCKS.
         `;
