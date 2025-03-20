@@ -6,12 +6,13 @@ import { getYtMetaData } from '../utils/funcs.js';
 export async function getYoutubeTranscript(videoId) {
     try {
         try {
+            console.log("Now fetching for transcript")
             const transcript = await getSubtitles({
                 videoID: videoId,
                 lang: 'en' // Default to English captions, you can make this configurable
             });
 
-            console.log(transcript)
+            console.log("Fetched for trascnript with success: ", transcript)
            
             if (transcript && transcript.length > 0) {
                 let formattedTranscript = '';
