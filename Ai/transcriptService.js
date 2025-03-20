@@ -2,65 +2,93 @@
 import axios from 'axios';
 import { getSubtitles } from 'youtube-captions-scraper';
 import { getYtMetaData } from '../utils/funcs.js';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from "puppeteer-extra-plugin-stealth"
+
+puppeteer.use(StealthPlugin())
 
 export async function getYoutubeTranscript(videoId) {
-    try {
-        try {
-            console.log("Now fetching for transcript")
-            const transcript = await getSubtitles({
-                videoID: videoId,
-                lang: 'en' // Default to English captions, you can make this configurable
-            });
+    const browser = await puppeteer.launch({
+        headless: "new",
+        ignoreDefaultArgs: ["--enable-automation"]
+    }); // Starting the headless browser (Chrome)
 
-            console.log("Fetched for trascnript with success: ", transcript)
-           
-            if (transcript && transcript.length > 0) {
-                let formattedTranscript = '';
-                transcript.forEach(entry => {
-                    const startSeconds = parseFloat(entry.start);
-                    const minutes = Math.floor(startSeconds / 60);
-                    const seconds = Math.floor(startSeconds % 60);
-                    const timestamp = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                   
-                    formattedTranscript += `[${timestamp}] ${entry.text}\n`;
-                });
-               
-                console.log("Successfully retrieved transcript using youtube-captions-scraper");
-                return {
-                    text: formattedTranscript,
-                    isRealTranscript: true
-                };
-            }
-        } catch (transcriptError) {
-            console.error('Error fetching YouTube transcript:', transcriptError.message);
-        }
-       
-        const metadata = await getYtMetaData(videoId);
-       
-        if (!metadata || !metadata.title) {
-            throw new Error('Could not retrieve video metadata');
-        }
-       
-        console.log("No transcript available, returning metadata only");
+    const page = await browser.newPage();
+    let result = null;
+    const url = `https://www.youtube.com/watch?v=${videoId}` // reading the URL
+
+    try {
+        await page.goto(url, { waitUntil: 'domcontentloaded' }); // opening the youtube URL
+
+        await page.evaluate(() => {
+            document.querySelector('button[aria-label*=cookies]')?.click() // closing the Cookie banner
+        });
+
+        await page.waitForSelector("ytd-video-description-transcript-section-renderer button", {
+            timeout: 10_000
+        }) // waiting max 10 seconds for the 'Show transcript' button to appear
+
+        await page.evaluate(() => {
+            document.querySelector('ytd-video-description-transcript-section-renderer button').click()
+        }) // clicking on the 'Show transcript' button
+
+        result = await parseTranscript(page); // parsing the transcript
+
+        await page.close()
+        await browser.close()
+
+        console.log(result) // returning the transcript
         return {
-            text: null,
-            isRealTranscript: false,
-            metadata: {
-                title: metadata.title,
-                author: metadata.author,
-                category: metadata.category,
-                description: metadata.description
-            }
-        };
-       
+            isRealTranscript: true,
+            text: result,
+        }
     } catch (error) {
-        console.error('Error in transcript service:', error);
-       
-        console.log('Using last resort fallback, no transcript available');
-        return {
-            text: null,
-            isRealTranscript: false,
-            isMinimalData: true
-        };
+        try {
+
+            const metadata = await getYtMetaData(videoId);
+
+            if (!metadata || !metadata.title) {
+                throw new Error('Could not retrieve video metadata');
+            }
+            console.log(error)
+
+            await page.close()
+            await browser.close()
+            return {
+                text: null,
+                isRealTranscript: false,
+                metadata: {
+                    title: metadata.title,
+                    author: metadata.author,
+                    category: metadata.category,
+                    description: metadata.description
+                }
+            };
+        } catch (e) {
+            return {
+                text: null,
+                isRealTranscript: false,
+                isMinimalData: true
+            };
+        }
     }
+}
+
+
+
+const parseTranscript = async (page) => {
+    // waiting max 10 seconds for the transcript container to appear
+    await page.waitForSelector('#segments-container', {
+        timeout: 10_000
+    });
+
+    // parsing all the text nodes from the transcript container and join them with an empty line
+    return page.evaluate(() => {
+        const arr = []
+        Array.from(document.querySelectorAll('#segments-container yt-formatted-string')).map(
+            element => {arr.push(element.textContent?.trim())})
+        Array.from(document.querySelectorAll('#segments-container .segment-timestamp')).map(
+            (element, i) => {arr[i] += ` (${element.textContent?.trim()})`})
+        return arr.join("\n")
+    });
 }

@@ -474,10 +474,10 @@ export async function analyzeContent(title, content, originalId) {
         },
         "timestamps": [
             {
-            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length and must be when was 'claim' said in the video,
+            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length this field must match the time provided in parenthesis with the claim,
             "timestampInStr": "time stamp in the format hh:mm:ss where hh is not mentioned if it is 00, you are allowed to say title instead of hh:mm:ss in case you are analysing the title",
             "label": "Correct" or "False" or "Misleading",
-            "claim": "The specific claim made, it must match what was said in the video",
+            "claim": "The specific claim made, it must match something in the content",
             "explanation": "Explanation of why this is correct/false/misleading",
             "source": "Source that verifies or contradicts this claim",
             "validation": {
@@ -490,7 +490,6 @@ export async function analyzeContent(title, content, originalId) {
                         "url": "URL if applicable",
                         "author": "Author name if applicable",
                         "publisher": "Publisher name if applicable",
-                        "publicationDate": "Date of publication if applicable this field must be castable by mongodb",
                         "credibilityScore": 1-10 (credibility rating where 10 is most credible)
                     }
                 ]
@@ -510,17 +509,19 @@ export async function analyzeContent(title, content, originalId) {
         7. References should be specific (not just "Wikipedia" but the specific article).
         8. Prioritize academic sources, government publications, peer-reviewed research, and established news organizations known for factual reporting.
         9. Avoid null values unless it is mentioned to do so
-        10. Dates must be provided in a way that makes them castable by MongoDB
         11. All fields are required
         12. You must at least mention one reference, the only exception is the title It can have no reference
         13. Ensure that you are using correct types and values
-        14. You must analyze all claims provided by the video
-        15: The alphanumeric value provided after content is the youtube id of the video that should be analyzed
-        16. The title can be only analyzed once
-        17. IMPORTANT: Be thorough in analyzing all important claims in the video. For videos longer than 5 minutes, aim to identify at least 8-10 distinct claims with timestamps. For shorter videos, aim to identify at least 5-6 claims. Ensure you capture both correct and incorrect claims.
-        18. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
-        19. Evenly distribute your analysis across the video timeline.
-        20. Make sure that timestamps match what is in the video
+        14: The alphanumeric value provided after content is the youtube id of the video that should be analyzed
+        15. The title can be only analyzed once
+        16. IMPORTANT: Be thorough in analyzing all important claims in the video. For videos longer than 5 minutes, aim to identify at least 8-10 distinct claims with timestamps. For shorter videos, aim to identify at least 5-6 claims. Ensure you capture both correct and incorrect claims.
+        17. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
+        18. Evenly distribute your analysis across the video timeline.
+        19. the back slash n marks a new start of a sentence only those sentences can be used in claims
+        20. each sentence contains the time it was mentioned between parenthesis
+        21. Make sure that timestamps claim matches at least one sentence in the captions
+        22. IMPORTANT don't put anything in claim that isnt mentioned in content and make sure that timestampInStr matches what is between the parenthesis
+        23. in the claim field remove the parenthesis
         
         DO NOT USE CODE BLOCKS AROUND THE JSON. RETURN ONLY THE CLEAN JSON OBJECT WITHOUT ANY FORMATTING OR CODE BLOCKS.
         `;
@@ -753,7 +754,6 @@ async function analyzeVideoWithoutTranscript(title, videoId) {
                         "url": "URL if applicable",
                         "author": "Author name if applicable",
                         "publisher": "Publisher name if applicable",
-                        "publicationDate": "Date of publication if applicable this field must be castable by mongodb",
                         "credibilityScore": 1-10 (credibility rating where 10 is most credible)
                     }
                 ]

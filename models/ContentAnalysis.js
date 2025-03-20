@@ -95,7 +95,6 @@ const contentAnalysisSchema = Schema({
                         url: String,
                         author:  String,
                         publisher: String,
-                        publicationDate: Date,
                         credibilityScore: {
                             type: Number,
                             min: 1,
