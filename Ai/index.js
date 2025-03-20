@@ -533,11 +533,6 @@ export async function analyzeContent(title, content, originalId) {
 
         analysisData.originalId = originalId;
 
-        if (!analysisData.educationalRecommendations || !Array.isArray(analysisData.educationalRecommendations) || analysisData.educationalRecommendations.length === 0) {
-            console.log("No educational recommendations found in initial analysis. Generating them separately...");
-            const recommendations = await generateEducationalRecommendations(analysisData);
-            analysisData.educationalRecommendations = recommendations;
-        }
 
         if (analysisData.educationalRecommendations && Array.isArray(analysisData.educationalRecommendations)) {
             analysisData.educationalRecommendations = analysisData.educationalRecommendations.filter(rec => {
@@ -722,61 +717,50 @@ async function analyzeVideoWithoutTranscript(title, videoId) {
         NOTE: This video does not have a transcript available. Please analyze this video directly using your knowledge of the video content.
         
         IMPORTANT: You MUST follow the exact JSON schema format below, with proper timestamps, claims, and all required fields:
-        {
+               {
         "conclusion": "Brief overall conclusion about the content's accuracy",
         "percentages": {
-        "overall": 0-100 (overall accuracy score),
-        "falseInformation": 0-100 (percentage of false information),
-        "verifiedInformation": 0-100 (percentage of verified information),
-        "misleadingInformation": 0-100 (percentage of misleading information)
+            "overall": 0-100 (overall accuracy score),
+            "falseInformation": 0-100 (percentage of false information),
+            "verifiedInformation": 0-100 (percentage of verified information),
+            "misleadingInformation": 0-100 (percentage of misleading information)
         },
         "generalTopic": "The general topic of the content",
         "topics": {
-        "categories": [
+            "categories": [
             {
-            "title": "Topic category name",
-            "count": Number of mentions
+                "title": "Topic category name",
+                "count": Number of mentions
             }
-        ],
-        "count": Total number of topics identified
+            ],
+            "count": Total number of topics identified
         },
         "timestamps": [
-        {
-            "timestampInS": timestamp in seconds (null for the title analysis),
-            "timestampInStr": "time stamp in the format mm:ss or title",
+            {
+            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length and must be when was 'claim' said in the video,
+            "timestampInStr": "time stamp in the format hh:mm:ss where hh is not mentioned if it is 00, you are allowed to say title instead of hh:mm:ss in case you are analysing the title",
             "label": "Correct" or "False" or "Misleading",
-            "claim": "The specific claim made",
+            "claim": "The specific claim made, it must match what was said in the video",
             "explanation": "Explanation of why this is correct/false/misleading",
             "source": "Source that verifies or contradicts this claim",
             "validation": {
-            "isValid": true/false,
-            "confidence": 0-100 (confidence score),
-            "explanation": "Detailed explanation with reasoning",
-            "references": [
-                {
-                "title": "Title of the reference",
-                "url": "URL if applicable",
-                "author": "Author name if applicable",
-                "publisher": "Publisher name if applicable",
-                "publicationDate": "Date of publication",
-                "credibilityScore": 1-10 (credibility rating)
-                }
-            ]
+                "isValid": true/false,
+                "confidence": 0-100 (confidence score),
+                "explanation": "Detailed explanation with reasoning",
+                "references": [
+                    {
+                        "title": "Title of the reference",
+                        "url": "URL if applicable",
+                        "author": "Author name if applicable",
+                        "publisher": "Publisher name if applicable",
+                        "publicationDate": "Date of publication if applicable this field must be castable by mongodb",
+                        "credibilityScore": 1-10 (credibility rating where 10 is most credible)
+                    }
+                ]
             }
-        }
+            }
         ],
-        "educationalRecommendations": [
-        {
-            "title": "Title of the educational resource",
-            "description": "Brief description of what this resource offers and why it's helpful",
-            "url": "A valid and working URL to the resource",
-            "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
-            "authorOrPublisher": "Name of the author or publishing organization",
-            "credibilityScore": 1-10 (credibility rating where 10 is most credible),
-            "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
         }
-        ]
-    }
         
         IMPORTANT: Even though there is no transcript, YOU MUST provide a thorough analysis with at least 5-10 specific claims and timestamps throughout the video. Base the timestamps on your knowledge of where key claims appear in the video. Ensure all percentages add up to 100%. Include 3-5 high-quality educational recommendations from reputable sources that are directly relevant to the video's topic.
         
@@ -985,24 +969,24 @@ function combineAnalysisResults(title, batchResults, videoId) {
     combinedResult.educationalRecommendations = allRecommendations.slice(0, 5);
     
     // If we have too few recommendations, generate more based on the combined topic
-    if (combinedResult.educationalRecommendations.length < 3) {
-        // Use the generateEducationalRecommendations function to get more recommendations
-        generateEducationalRecommendations(combinedResult)
-            .then(newRecommendations => {
-                // Add unique new recommendations
-                if (Array.isArray(newRecommendations)) {
-                    newRecommendations.forEach(rec => {
-                        if (rec.url && !recommendationsMap.has(rec.url)) {
-                            recommendationsMap.set(rec.url, rec);
-                            combinedResult.educationalRecommendations.push(rec);
-                        }
-                    });
+    // if (combinedResult.educationalRecommendations.length < 3) {
+    //     // Use the generateEducationalRecommendations function to get more recommendations
+    //     generateEducationalRecommendations(combinedResult)
+    //         .then(newRecommendations => {
+    //             // Add unique new recommendations
+    //             if (Array.isArray(newRecommendations)) {
+    //                 newRecommendations.forEach(rec => {
+    //                     if (rec.url && !recommendationsMap.has(rec.url)) {
+    //                         recommendationsMap.set(rec.url, rec);
+    //                         combinedResult.educationalRecommendations.push(rec);
+    //                     }
+    //                 });
                     
-                    // Limit to 5 recommendations total
-                    combinedResult.educationalRecommendations = combinedResult.educationalRecommendations.slice(0, 5);
-                }
-            });
-    }
+    //                 // Limit to 5 recommendations total
+    //                 combinedResult.educationalRecommendations = combinedResult.educationalRecommendations.slice(0, 5);
+    //             }
+    //         });
+    // }
     
     // Generate a conclusion
     combinedResult.conclusion = generateConclusion(combinedResult);
