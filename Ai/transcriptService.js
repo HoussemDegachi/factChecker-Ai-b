@@ -37,7 +37,6 @@ export async function getYoutubeTranscript(videoId) {
         await page.close()
         await browser.close()
 
-        console.log(result) // returning the transcript
         return {
             isRealTranscript: true,
             text: result,
@@ -88,7 +87,7 @@ const parseTranscript = async (page) => {
         Array.from(document.querySelectorAll('#segments-container yt-formatted-string')).map(
             element => {arr.push(element.textContent?.trim())})
         Array.from(document.querySelectorAll('#segments-container .segment-timestamp')).map(
-            (element, i) => {arr[i] += ` (${element.textContent?.trim()})`})
+            (element, i) => {arr[i] = `[${element.textContent?.trim()}] ` + arr[i]})
         return arr.join("\n")
     });
 }

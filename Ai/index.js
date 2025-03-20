@@ -454,7 +454,7 @@ export async function analyzeContent(title, content, originalId) {
         Content: ${content}
         
         Please provide a detailed analysis of video AND make SURE you go through the entire video and give a detailed analysis in the following JSON format:
-        {
+{
         "conclusion": "Brief overall conclusion about the content's accuracy",
         "percentages": {
             "overall": 0-100 (overall accuracy score),
@@ -474,10 +474,10 @@ export async function analyzeContent(title, content, originalId) {
         },
         "timestamps": [
             {
-            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length this field must match the time provided in parenthesis with the claim,
+            "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length and must be when was 'claim' said in the video,
             "timestampInStr": "time stamp in the format hh:mm:ss where hh is not mentioned if it is 00, you are allowed to say title instead of hh:mm:ss in case you are analysing the title",
             "label": "Correct" or "False" or "Misleading",
-            "claim": "The specific claim made, it must match something in the content",
+            "claim": "The specific claim made, it must match what was said in the video",
             "explanation": "Explanation of why this is correct/false/misleading",
             "source": "Source that verifies or contradicts this claim",
             "validation": {
@@ -509,19 +509,17 @@ export async function analyzeContent(title, content, originalId) {
         7. References should be specific (not just "Wikipedia" but the specific article).
         8. Prioritize academic sources, government publications, peer-reviewed research, and established news organizations known for factual reporting.
         9. Avoid null values unless it is mentioned to do so
+        10. Dates must be provided in a way that makes them castable by MongoDB
         11. All fields are required
         12. You must at least mention one reference, the only exception is the title It can have no reference
         13. Ensure that you are using correct types and values
-        14: The alphanumeric value provided after content is the youtube id of the video that should be analyzed
-        15. The title can be only analyzed once
-        16. IMPORTANT: Be thorough in analyzing all important claims in the video. For videos longer than 5 minutes, aim to identify at least 8-10 distinct claims with timestamps. For shorter videos, aim to identify at least 5-6 claims. Ensure you capture both correct and incorrect claims.
-        17. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
-        18. Evenly distribute your analysis across the video timeline.
-        19. the back slash n marks a new start of a sentence only those sentences can be used in claims
-        20. each sentence contains the time it was mentioned between parenthesis
-        21. Make sure that timestamps claim matches at least one sentence in the captions
-        22. IMPORTANT don't put anything in claim that isnt mentioned in content and make sure that timestampInStr matches what is between the parenthesis
-        23. in the claim field remove the parenthesis
+        14. You must analyze all claims provided by the video
+        15: The alphanumeric value provided after content is the youtube id of the video that should be analyzed
+        16. The title can be only analyzed once
+        17. IMPORTANT: Be thorough in analyzing all important claims in the video. For videos longer than 5 minutes, aim to identify at least 8-10 distinct claims with timestamps. For shorter videos, aim to identify at least 5-6 claims. Ensure you capture both correct and incorrect claims.
+        18. Make sure to analyze claims throughout the entire duration of the video, not just from the beginning.
+        19. Evenly distribute your analysis across the video timeline.
+        20. Make sure that the timestamp match what is in the content both in time and claim
         
         DO NOT USE CODE BLOCKS AROUND THE JSON. RETURN ONLY THE CLEAN JSON OBJECT WITHOUT ANY FORMATTING OR CODE BLOCKS.
         `;
@@ -549,72 +547,72 @@ export async function analyzeContent(title, content, originalId) {
     }
 }
 
-async function generateEducationalRecommendations(analysisData) {
-    try {
-        const generalTopic = analysisData.generalTopic || '';
+// async function generateEducationalRecommendations(analysisData) {
+//     try {
+//         const generalTopic = analysisData.generalTopic || '';
         
-        const subtopics = analysisData.topics && analysisData.topics.categories 
-            ? analysisData.topics.categories.map(cat => cat.title).join(', ')
-            : '';
+//         const subtopics = analysisData.topics && analysisData.topics.categories 
+//             ? analysisData.topics.categories.map(cat => cat.title).join(', ')
+//             : '';
         
-        const keyClaims = analysisData.timestamps 
-            ? analysisData.timestamps
-                .filter(ts => ts.label === 'False' || ts.label === 'Misleading')
-                .map(ts => ts.claim)
-                .join('; ')
-            : '';
+//         const keyClaims = analysisData.timestamps 
+//             ? analysisData.timestamps
+//                 .filter(ts => ts.label === 'False' || ts.label === 'Misleading')
+//                 .map(ts => ts.claim)
+//                 .join('; ')
+//             : '';
             
-        const prompt = `Generate 3-5 high-quality educational recommendations for someone who wants to learn more about "${generalTopic}".
+//         const prompt = `Generate 3-5 high-quality educational recommendations for someone who wants to learn more about "${generalTopic}".
         
-        Subtopics mentioned: ${subtopics}
+//         Subtopics mentioned: ${subtopics}
         
-        Key claims that need educational context: ${keyClaims}
+//         Key claims that need educational context: ${keyClaims}
         
-        Return the recommendations in this JSON format:
-        [
-            {
-                "title": "Title of the educational resource",
-                "description": "Brief description of what this resource offers and why it's helpful",
-                "url": "A valid and working URL to the resource",
-                "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
-                "authorOrPublisher": "Name of the author or publishing organization",
-                "credibilityScore": 1-10 (credibility rating where 10 is most credible),
-                "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
-            }
-        ]
+//         Return the recommendations in this JSON format:
+//         [
+//             {
+//                 "title": "Title of the educational resource",
+//                 "description": "Brief description of what this resource offers and why it's helpful",
+//                 "url": "A valid and working URL to the resource",
+//                 "type": One of ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
+//                 "authorOrPublisher": "Name of the author or publishing organization",
+//                 "credibilityScore": 1-10 (credibility rating where 10 is most credible),
+//                 "relevantTopics": ["Topic1", "Topic2"] - list of topics this resource covers
+//             }
+//         ]
         
-        IMPORTANT:
-        1. Only include REAL resources with VALID URLs from reputable sources
-        2. Focus on educational resources from universities, established educational platforms, government agencies, etc.
-        3. Include a mix of resource types (articles, videos, courses, etc.)
-        4. Make sure URLs are correct and working
-        5. Make descriptions specific about what the learner will gain
-        6. Ensure high relevance to the topic and especially to correct misconceptions from the video
-        7. Do not include resources that might spread misinformation
-        8. Only assign high credibility scores (8-10) to resources from the most authoritative sources
+//         IMPORTANT:
+//         1. Only include REAL resources with VALID URLs from reputable sources
+//         2. Focus on educational resources from universities, established educational platforms, government agencies, etc.
+//         3. Include a mix of resource types (articles, videos, courses, etc.)
+//         4. Make sure URLs are correct and working
+//         5. Make descriptions specific about what the learner will gain
+//         6. Ensure high relevance to the topic and especially to correct misconceptions from the video
+//         7. Do not include resources that might spread misinformation
+//         8. Only assign high credibility scores (8-10) to resources from the most authoritative sources
         
-        Return ONLY the JSON array with no explanatory text, markdown formatting, or code blocks.`;
+//         Return ONLY the JSON array with no explanatory text, markdown formatting, or code blocks.`;
         
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+//         const result = await model.generateContent(prompt);
+//         const response = await result.response;
+//         const text = response.text();
         
-        try {
-            return JSON.parse(text);
-        } catch (error) {
-            const jsonMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
-            if (jsonMatch && jsonMatch[1]) {
-                return JSON.parse(jsonMatch[1]);
-            }
+//         try {
+//             return JSON.parse(text);
+//         } catch (error) {
+//             const jsonMatch = text.match(/```(?:json)?\s*\n([\s\S]*?)\n\s*```/);
+//             if (jsonMatch && jsonMatch[1]) {
+//                 return JSON.parse(jsonMatch[1]);
+//             }
             
-            console.error('Failed to parse educational recommendations:', error);
-            return createDefaultRecommendations(generalTopic);
-        }
-    } catch (error) {
-        console.error('Error generating educational recommendations:', error);
-        return createDefaultRecommendations(analysisData.generalTopic || '');
-    }
-}
+//             console.error('Failed to parse educational recommendations:', error);
+//             return createDefaultRecommendations(generalTopic);
+//         }
+//     } catch (error) {
+//         console.error('Error generating educational recommendations:', error);
+//         return createDefaultRecommendations(analysisData.generalTopic || '');
+//     }
+// }
 
 function createDefaultRecommendations(topic) {
     const sanitizedTopic = topic.replace(/[^\w\s]/gi, '').trim() || 'General Knowledge';
@@ -665,7 +663,9 @@ export async function analyzeYoutubeVideo(videoId) {
         await printTranscriptWithTimestamps(videoId);
 
         const durationInSeconds = parseInt(metadata.lengthSeconds || "0");
-        
+        console.log('-----------------------------------------')
+        console.log("Your transcript: ")
+        console.log(transcript)
         console.log('Checking batch processing conditions:');
         console.log('- isRealTranscript:', isRealTranscript);
         console.log('- durationInSeconds > 300:', durationInSeconds > 300, `(${durationInSeconds} seconds)`);
@@ -715,7 +715,7 @@ async function analyzeVideoWithoutTranscript(title, videoId) {
         Video ID: ${videoId}
         Title: ${title}
         
-        NOTE: This video does not have a transcript available. Please analyze this video directly using your knowledge of the video content.
+ NOTE: This video does not have a transcript available. Please analyze this video directly using your knowledge of the video content.
         
         IMPORTANT: You MUST follow the exact JSON schema format below, with proper timestamps, claims, and all required fields:
                {
@@ -1109,6 +1109,6 @@ export default {
     analyzeLongVideoInBatches,
     validateAndFixTopicsCount,
     combineAnalysisResults,
-    generateEducationalRecommendations,
+    // generateEducationalRecommendations,
     validateEducationalRecommendations
 };
