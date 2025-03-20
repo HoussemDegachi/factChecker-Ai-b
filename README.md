@@ -1,4 +1,7 @@
-## 🚀 Run Our Extension Locally
+## 🚀 Run Our Backend Locally
+
+this backend is hosted [https://missinformation-detector-b-production.up.railway.app/](https://missinformation-detector-b-production.up.railway.app/)
+Route: /analysis/{YtVideoId}
 
 make sure you download the [extension](https://github.com/HoussemDegachi/FactChecker-Ai)
 
