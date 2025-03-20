@@ -10,7 +10,7 @@ puppeteer.use(StealthPlugin())
 export async function getYoutubeTranscript(videoId) {
     const browser = await puppeteer.launch({
         headless: "true",
-        ignoreDefaultArgs: ["--no-sandbox", "'--disable-setuid-sandbox'"]
+        args: ["--no-sandbox", "'--disable-setuid-sandbox'"]
     }); // Starting the headless browser (Chrome)
 
     const page = await browser.newPage();
