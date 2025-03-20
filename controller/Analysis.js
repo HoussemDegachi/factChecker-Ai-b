@@ -6,10 +6,10 @@ export const get = async (req, res) => {
 
     const { id } = req.body
 
-    // const analysis = await ContentAnalysis.findOne({ originalId: id })
+    const analysis = await ContentAnalysis.findOne({ originalId: id })
 
-    // // if analysis already exist for this video
-    // if (analysis) return res.status(200).json(analysis)
+    // if analysis already exist for this video
+    if (analysis) return res.status(200).json(analysis)
 
     // else create new analysis
     const analysisResult = await analyzeYoutubeVideo(id);
