@@ -10,6 +10,8 @@ export async function getYoutubeTranscript(videoId) {
                 videoID: videoId,
                 lang: 'en' // Default to English captions, you can make this configurable
             });
+
+            console.log(transcript)
            
             if (transcript && transcript.length > 0) {
                 let formattedTranscript = '';
