@@ -477,7 +477,7 @@ export async function analyzeContent(title, content, originalId) {
             "timestampInS": approximate timestamp in seconds use null in case you are talking about the title and it must be less then the video 's length and must be when was 'claim' said in the video,
             "timestampInStr": "time stamp in the format hh:mm:ss where hh is not mentioned if it is 00, you are allowed to say title instead of hh:mm:ss in case you are analysing the title",
             "label": "Correct" or "False" or "Misleading",
-            "claim": "The specific claim made",
+            "claim": "The specific claim made, it must match what was said in the video",
             "explanation": "Explanation of why this is correct/false/misleading",
             "source": "Source that verifies or contradicts this claim",
             "validation": {
