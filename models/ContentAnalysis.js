@@ -106,44 +106,6 @@ const contentAnalysisSchema = Schema({
             }
         }
     ],
-    educationalRecommendations: [
-        {
-            title: {
-                type: String,
-                required: true
-            },
-            description: {
-                type: String,
-                required: true
-            },
-            url: {
-                type: String,
-                required: true,
-                validate: {
-                    validator: function(v) {
-                        return /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/.test(v);
-                    },
-                    message: props => `${props.value} is not a valid URL!`
-                }
-            },
-            type: {
-                type: String,
-                enum: ["Article", "Video", "Course", "Book", "Research Paper", "Website"],
-                required: true
-            },
-            authorOrPublisher: {
-                type: String,
-                required: true
-            },
-            credibilityScore: {
-                type: Number,
-                min: 1,
-                max: 10,
-                required: true
-            },
-            relevantTopics: [String]
-        }
-    ]
 })
 
 export default model("ContentAnalysis", contentAnalysisSchema)
