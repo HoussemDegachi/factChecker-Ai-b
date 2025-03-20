@@ -490,7 +490,7 @@ export async function analyzeContent(title, content, originalId) {
                         "url": "URL if applicable",
                         "author": "Author name if applicable",
                         "publisher": "Publisher name if applicable",
-                        "publicationDate": "Date of publication if applicable",
+                        "publicationDate": "Date of publication if applicable this field must be castable by mongodb",
                         "credibilityScore": 1-10 (credibility rating where 10 is most credible)
                     }
                 ]
